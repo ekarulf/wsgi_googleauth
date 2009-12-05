@@ -7,24 +7,31 @@ import random
 from functools import wraps
 from hashlib import sha1 as sha1_constructor
 
-def cache(**options):
-    salt = random.random()
-    cache = collections.deque()
-    # Options
-    self.timeout = options.get('timeout', 60*30) # 30 minutes
-    self.ignore_environ = options.get('ignore_environ', True) # by default, ignore the environment variables
-    self.cache_true_only = options.get('cache_true_only', True)
-    def wrap(f):
+class Cache(object):
+    """
+    Caches the result of the mod_wsgi authorization functions.
+    Rewritten from a large 
+    """
+    def __init__(self, **options):
+        # Options
+        self.timeout = options.get('timeout', 60*30) # 30 minutes
+        self.ignore_environ = options.get('ignore_environ', True) # by default, ignore the environment variables
+        self.cache_true_only = options.get('cache_true_only', True)
+        # Cache Structure
+        self.salt = random.random()
+        self.cache = collections.deque()
+        
+    def __call__(self, f):
         @wraps(f)
         def wrapper(*args):
             now = time.time()
-            hash_args = args[1:] if ignore_environ else args
-            checksum = sha_constructor(repr((salt, hash_args))).hexdigest()
+            hash_args = args[1:] if self.ignore_environ else args
+            checksum = sha_constructor(repr((self.salt, hash_args))).hexdigest()
             result = None
-            for cache_checksum, cache_expiration, cache_result in cache:
+            for cache_checksum, cache_expiration, cache_result in self.cache:
                 if cache_expiration < now:
                     try:
-                        cache.remove((cache_checksum, cache_expiration, cache_result))
+                        self.cache.remove((cache_checksum, cache_expiration, cache_result))
                     except ValueError:
                         pass
                     continue
@@ -40,4 +47,3 @@ def cache(**options):
                     cache.append((checksum, now + timeout, result))
             return result
         return wrapper
-    return wrap
