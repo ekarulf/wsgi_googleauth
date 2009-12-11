@@ -62,8 +62,8 @@ class Cache(object):
     ... begin = time.time()
     >>> result = test(None, 'user', 'password')
     >>> assert result
-    >>> time.time() - begin > 1.0
-    True
+    >>> time.time() - begin < 1.0
+    False
     >>> 
     """
     def __init__(self, **options):
@@ -170,12 +170,12 @@ class RequireDomain(object):
                 return False
         return wrapper
 
-class RequireEmail(object):
+class RequireValidEmail(object):
     """
     Requires a valid email address
 
     Example:
-    >>> @RequireEmail()
+    >>> @RequireValidEmail()
     ... def test(environ, user, password):
     ...     return True
     ... 
