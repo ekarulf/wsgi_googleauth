@@ -88,10 +88,7 @@ class Cache(object):
             prune_list = []
             for cache_checksum, cache_expiration, cache_result in self.cache:
                 if cache_expiration < now:
-                    try:
-                        prune_list.append((cache_checksum, cache_expiration, cache_result))
-                    except ValueError:
-                        pass
+                    prune_list.append((cache_checksum, cache_expiration, cache_result))
                     continue
                 if cache_checksum == checksum:
                     result = cache_result
@@ -99,7 +96,10 @@ class Cache(object):
                     # We have what we are looking for and we are done pruning
                     break
             for cache_entry in prune_list:
-                self.cache.remove(cache_entry)
+                try:
+                    self.cache.remove(cache_entry)
+                except ValueError:
+                    pass
             if result is None:
                 # Cache-Miss: Let's query the function
                 result = f(*args)
