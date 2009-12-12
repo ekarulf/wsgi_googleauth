@@ -150,9 +150,7 @@ class RequireDomain(object):
     ...     return True
     ... 
     >>> test(None, 'erik', None)
-    False
     >>> test(None, 'erik@karulf.com', None)
-    False
     >>> test(None, 'erik@example.com', None)
     True
     >>> 
@@ -167,7 +165,7 @@ class RequireDomain(object):
             if match is not None and match[1] == self.domain:
                 return f(environ, name, *args)
             else:
-                return False
+                return None
         return wrapper
 
 class RequireValidEmail(object):
@@ -180,7 +178,6 @@ class RequireValidEmail(object):
     ...     return True
     ... 
     >>> test(None, 'erik', 'password')
-    False
     >>> test(None, 'erik@example.com', 'password')
     True
     """
@@ -193,6 +190,6 @@ class RequireValidEmail(object):
             if valid_email(name):
                 return f(environ, name, *args)
             else:
-                return False
+                return None
         return wrapper
 
