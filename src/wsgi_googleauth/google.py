@@ -17,21 +17,21 @@ class GoogleAuth(object):
         Authentication handler that checks against Google Accounts (Google Apps / Regular Google Account)
         """
         if not valid_email(user):
-            logging.info("Refusing to authenticate against Google for non-email address {0}".format(user))
+            logging.info("Refusing to authenticate against Google for non-email address %s" % (user))
             return None
 
         service = ContactsService(email=user, password=password)
         try:
             service.ProgrammaticLogin()
         except BadAuthentication:
-            logging.warn("Unsuccessful authentication returned by Google for {0}".format(user))
+            logging.warn("Unsuccessful authentication returned by Google for %s" % (user))
             return False
         except CaptchaRequired:
-            logging.error("CAPTCHA request returned by Google for {0}".format(user))
+            logging.error("CAPTCHA request returned by Google for %s" % (user))
         except:
-            logging.error("Unknown error returned by Google for {0}".format(user))
+            logging.error("Unknown error returned by Google for %s" % (user))
         else:
-            logging.info("Successful authentication returned by Google for {0}".format(user))
+            logging.info("Successful authentication returned by Google for %s" % (user))
             return True
         return None
 

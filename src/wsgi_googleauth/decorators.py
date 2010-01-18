@@ -135,6 +135,7 @@ class DefaultDomain(object):
             if not valid_email(name):
                 new_name = "{0}@{1}".format(name, self.domain)
                 if valid_email(new_name):
+                    logging.info("Defaulting username %s to %s" % (name, new_name))
                     name = new_name
             return f(environ, name, *args)
         return wrapper
@@ -165,6 +166,7 @@ class RequireDomain(object):
             if match is not None and match[1] == self.domain:
                 return f(environ, name, *args)
             else:
+                logging.info("Ignoring username %s as it does not match domain %s" % (name, self.domain))
                 return None
         return wrapper
 
@@ -190,6 +192,7 @@ class RequireValidEmail(object):
             if valid_email(name):
                 return f(environ, name, *args)
             else:
+                logging.info("Ignoring username %s as it is not a valid email")
                 return None
         return wrapper
 
