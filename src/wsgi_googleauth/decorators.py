@@ -163,7 +163,7 @@ class DefaultDomain(object):
         @wraps(f)
         def wrapper(environ, name, *args):
             if not valid_email(name):
-                new_name = "{0}@{1}".format(name, self.domain)
+                new_name = "%s@%s" % (name, self.domain)
                 if valid_email(new_name):
                     logging.info("Defaulting username %s to %s" % (name, new_name))
                     name = new_name
