@@ -16,9 +16,11 @@ import time
 import logging
 import collections
 import random
+import sqlite3
+import os
 from functools import wraps
-from hashlib import sha1
-from wsgi_googleauth.util import valid_email, parse_email
+from hashlib import sha256
+from wsgi_googleauth.util import valid_email, parse_email, encode_value, decode_value
 
 class Cache(object):
     """
@@ -28,7 +30,7 @@ class Cache(object):
     
     >>> import time
     >>> 
-    >>> @Cache(timeout=10.0)
+    >>> @Cache(":memory:", timeout=10.0)
     ... def test(environ, user, password):
     ...     time.sleep(5.0)
     ...     return password == 'password'
@@ -66,45 +68,73 @@ class Cache(object):
     False
     >>> 
     """
-    def __init__(self, **options):
+    SALT_NAME = 'salt'
+    
+    def _normalize_filename(self, filename):
+        if filename[0] == '~':
+            # Relative to policy file
+            import policy
+            filename = os.path.abspath(os.path.join(os.path.dirname(policy.__file__), '..')) + filename[1:]
+        return filename
+    
+    def __init__(self, filename, **options):
         # Options
         self.timeout = options.get('timeout', 60*30) # 30 minutes
         self.ignore_environ = options.get('ignore_environ', True) # by default, ignore the environment variables
         self.cache_true_only = options.get('cache_true_only', True)
-        # Cache Structure
-        self.salt = random.random()
-        self.cache = collections.deque()
+        self.salt = None
         
+        # Connect to the database
+        filename = self._normalize_filename(filename)
+        # TODO: Enforce 0600 perms on UNIX?
+        self.conn = sqlite3.connect(filename)
+        c = self.conn.cursor()
+        try:
+            c.execute("CREATE TABLE cache (key TEXT UNIQUE, value TEXT, expiration INTEGER);")
+        except sqlite3.OperationalError:
+            # Cache table exists
+            c.execute('DELETE FROM cache WHERE expiration < ?;', (time.time(),))
+            c.execute("SELECT value FROM cache WHERE key = ? LIMIT 1", (Cache.SALT_NAME, ))
+            for row in c:
+                self.salt = decode_value(row[0])
+        else:
+            # Cache table just created
+            self.salt = os.urandom(128)
+            c.execute("CREATE INDEX IF NOT EXISTS expiration ON cache (expiration ASC);")
+            c.execute('INSERT INTO cache(key, value) VALUES (?, ?);', (Cache.SALT_NAME, encode_value(self.salt)))
+        self.conn.commit()
+        assert self.salt is not None, "wsgi_googleauth Error: Salt not initialized"
+
     def __call__(self, f):
         @wraps(f)
         def wrapper(*args):
             # Invariant: cache is sorted by timeout
             # Requirement: time.time is a monotonically increasing function
-            # FIXME: If cache_true_only is False and the result is None, it is always a cache miss
-            now = time.time()
-            hash_args = args[1:] if self.ignore_environ else args
-            checksum = sha1(repr((self.salt, hash_args))).hexdigest()
-            result = None
-            prune_list = []
-            for cache_checksum, cache_expiration, cache_result in self.cache:
-                if cache_expiration < now:
-                    prune_list.append((cache_checksum, cache_expiration, cache_result))
-                    continue
-                if cache_checksum == checksum:
-                    result = cache_result
-                if result is not None and cache_expiration > now:
-                    # We have what we are looking for and we are done pruning
-                    break
-            for cache_entry in prune_list:
-                try:
-                    self.cache.remove(cache_entry)
-                except ValueError:
-                    pass
-            if result is None:
-                # Cache-Miss: Let's query the function
+            c = self.conn.cursor()
+
+            # Generate Key
+            # TODO: Use a more secure alternative like scrypt or PBKDF2
+            hash_args = args[1:] if self.ignore_environ else args[:]
+            hash_args = (self.salt,) + hash_args
+            key = sha256(encode_value(hash_args)).hexdigest()
+
+            # Cache Lookup
+            found = False
+            c.execute("SELECT value FROM cache WHERE key = ? AND expiration > ? LIMIT 1;", (key, time.time()))
+            for row in c:
+                result = decode_value(row[0])
+                found = True
+
+            # Query Function
+            if not found:
                 result = f(*args)
                 if not self.cache_true_only or (self.cache_true_only and result is True):
-                    self.cache.append((checksum, time.time() + self.timeout, result))
+                    timeout = time.time() + self.timeout
+                    try:
+                        c.execute("INSERT INTO cache(key, value, expiration) VALUES (?, ?, ?);", (key, encode_value(result), timeout))
+                    except sqlite3.IntegrityError:
+                        c.execute("UPDATE cache SET expiration = ? WHERE key = ?;", (timeout, key))
+                    self.conn.commit()
             return result
         return wrapper
 

@@ -1,6 +1,11 @@
 # Copyright 2009 - Erik Karulf - MIT License - See LICENSE.txt
 import re
 
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 # email_re copied from Django 1.1
 # Copyright (c) Django Software Foundation and individual contributors.
 email_re = re.compile(
@@ -34,3 +39,8 @@ def parse_email(user):
     else:
         return None
 
+def encode_value(obj):
+    return pickle.dumps(obj)
+
+def decode_value(buf):
+    return pickle.loads(str(buf))
