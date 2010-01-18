@@ -1,2 +1,7 @@
-.svn
-.*\.pyc
+\.DS_Store/
+bin/
+eggs/
+config/
+src/wsgi_googleauth.egg-info/
+\.installed.cfg
+.*.pyc
