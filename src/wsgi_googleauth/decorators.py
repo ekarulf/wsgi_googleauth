@@ -90,20 +90,24 @@ class Cache(object):
         # TODO: Enforce 0600 perms on UNIX?
         self.conn = sqlite3.connect(filename)
         c = self.conn.cursor()
-        try:
-            c.execute("CREATE TABLE cache (key TEXT UNIQUE, value TEXT, expiration INTEGER);")
-        except sqlite3.OperationalError:
-            # Cache table exists
-            c.execute('DELETE FROM cache WHERE expiration < ?;', (time.time(),))
-            c.execute("SELECT value FROM cache WHERE key = ? LIMIT 1", (Cache.SALT_NAME, ))
-            for row in c:
-                self.salt = decode_value(row[0])
-        else:
-            # Cache table just created
-            self.salt = os.urandom(128)
-            c.execute("CREATE INDEX IF NOT EXISTS expiration ON cache (expiration ASC);")
-            c.execute('INSERT INTO cache(key, value) VALUES (?, ?);', (Cache.SALT_NAME, encode_value(self.salt)))
-        self.conn.commit()
+        attempts = 0
+        while self.salt is None and attempts <= 1:
+            try:
+                c.execute("CREATE TABLE cache (key TEXT UNIQUE, value TEXT, expiration INTEGER);")
+            except sqlite3.OperationalError:
+                # Cache table exists
+                c.execute('DELETE FROM cache WHERE expiration < ?;', (time.time(),))
+                c.execute("SELECT value FROM cache WHERE key = ? LIMIT 1;", (Cache.SALT_NAME, ))
+                for row in c:
+                    self.salt = decode_value(row[0])
+            else:
+                # Cache table just created
+                salt = os.urandom(128)
+                c.execute("CREATE INDEX IF NOT EXISTS expiration ON cache (expiration ASC);")
+                c.execute('INSERT INTO cache(key, value) VALUES (?, ?);', (Cache.SALT_NAME, encode_value(salt)))
+            finally:
+                self.conn.commit()
+            attempts += 1
         assert self.salt is not None, "wsgi_googleauth Error: Salt not initialized"
 
     def __call__(self, f):
