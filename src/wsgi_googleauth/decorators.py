@@ -71,11 +71,11 @@ class Cache(object):
     SALT_NAME = 'salt'
     
     def _normalize_filename(self, filename):
-        if filename[0] == '~':
+        if filename[0:2] == '~/':
             # Relative to policy file
             import policy
-            filename = os.path.abspath(os.path.join(os.path.dirname(policy.__file__), '..')) + filename[1:]
-        return filename
+            filename = os.path.join(os.path.join(os.path.dirname(policy.__file__), '..'), filename[2:])
+        return os.path.abspath(filename)
     
     def __init__(self, filename, **options):
         # Options
@@ -85,7 +85,8 @@ class Cache(object):
         self.salt = None
         
         # Connect to the database
-        filename = self._normalize_filename(filename)
+        if not filename == ':memory:':
+            filename = self._normalize_filename(filename)
         # TODO: Enforce 0600 perms on UNIX?
         self.conn = sqlite3.connect(filename)
         c = self.conn.cursor()
