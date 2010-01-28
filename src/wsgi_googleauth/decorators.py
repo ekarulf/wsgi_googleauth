@@ -12,6 +12,8 @@ The following assumptions are made:
  * Wrapped functions are assumed to return True, False, or None
 """
 
+import hashlib
+import hmac
 import time
 import logging
 import collections
@@ -19,7 +21,6 @@ import random
 import sqlite3
 import os
 from functools import wraps
-from hashlib import sha256
 from wsgi_googleauth.util import valid_email, parse_email, encode_value, decode_value
 
 class Cache(object):
@@ -120,8 +121,7 @@ class Cache(object):
             # Generate Key
             # TODO: Use a more secure alternative like scrypt or PBKDF2
             hash_args = args[1:] if self.ignore_environ else args[:]
-            hash_args = (self.salt,) + hash_args
-            key = sha256(encode_value(hash_args)).hexdigest()
+            key = hmac.new(self.salt, encode_value(hash_args), digestmod=hashlib.sha256).hexdigest()
 
             # Cache Lookup
             found = False
