@@ -103,7 +103,7 @@ class Cache(object):
                     self.salt = decode_value(row[0])
             else:
                 # Cache table just created
-                salt = os.urandom(128)
+                salt = os.urandom(hmac.HMAC.blocksize) # Default: 512-bit HMAC
                 c.execute("CREATE INDEX IF NOT EXISTS expiration ON cache (expiration ASC);")
                 c.execute('INSERT INTO cache(key, value) VALUES (?, ?);', (Cache.SALT_NAME, encode_value(salt)))
             finally:
@@ -119,7 +119,6 @@ class Cache(object):
             c = self.conn.cursor()
 
             # Generate Key
-            # TODO: Use a more secure alternative like scrypt or PBKDF2
             hash_args = args[1:] if self.ignore_environ else args[:]
             key = hmac.new(self.salt, encode_value(hash_args), digestmod=hashlib.sha256).hexdigest()
 
